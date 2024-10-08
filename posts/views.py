@@ -1,10 +1,11 @@
 from flask import Blueprint, render_template, flash, url_for, redirect
 from config import db, Post
 from posts.forms import PostForm
+from sqlalchemy import desc
 
 posts_bp = Blueprint('posts', __name__, template_folder='templates')
 
-@posts_bp.route('/create')
+@posts_bp.route('/create', methods=('GET', 'POST'))
 def create():
 
     form = PostForm()
@@ -22,4 +23,27 @@ def create():
 
 @posts_bp.route('/posts')
 def posts():
-    return render_template('posts/posts.html')
+    all_posts = Post.query.order_by(desc('id')).all()
+    return render_template('posts/posts.html', posts=all_posts)
+
+@posts_bp.route('/<int:id>/update', methods=('GET', 'POST'))
+def update(id):
+
+    post_to_update = Post.query.filter_by(id=id).first()
+
+    if not post_to_update:
+        return redirect(url_for('posts.posts'))
+
+    form = PostForm()
+
+    if form.validate_on_submit():
+        post_to_update.update(title=form.title.data, body=form.body.data)
+
+        flash('Post updated', category='success')
+        return redirect(url_for('posts.posts'))
+
+
+    form.title.data = post_to_update.title
+    form.body.data = post_to_update.body
+
+    return render_template('posts/update.html', form=form)

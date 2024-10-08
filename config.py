@@ -47,6 +47,12 @@ class Post(db.Model):
        self.title = title
        self.body = body
 
+   def update(self, title, body):
+       self.created = datetime.now()
+       self.title = title
+       self.body = body
+       db.session.commit()
+
 # DATABASE ADMINISTRATOR
 class MainIndexLink(MenuLink):
     def get_url(self):
@@ -57,6 +63,8 @@ class PostView(ModelView):
     column_display_pk = True
     column_hide_backrefs = False
     column_list = ('id', 'created', 'title', 'body')
+
+
 
 admin = Admin(app, name='DB Admin', template_mode='bootstrap4')
 admin._menu = admin._menu[1:]
