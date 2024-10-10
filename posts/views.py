@@ -2,7 +2,9 @@ from flask import Blueprint, render_template, flash, url_for, redirect
 from config import db, Post
 from posts.forms import PostForm
 from sqlalchemy import desc
-
+from flask import Blueprint, render_template, flash, redirect, url_for
+from accounts.forms import RegistrationForm
+from config import User, db
 posts_bp = Blueprint('posts', __name__, template_folder='templates')
 
 @posts_bp.route('/create', methods=('GET', 'POST'))
