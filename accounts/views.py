@@ -1,4 +1,6 @@
 from flask import Blueprint, render_template, flash, redirect, url_for
+from flask_sqlalchemy import session
+
 from accounts.forms import RegistrationForm
 from config import User, db
 from flask_login import login_user
@@ -38,6 +40,10 @@ def registration():
 @accounts_bp.route('/login', methods=['GET', 'POST'])
 def login():
     form = LoginForm()
+    max_login_attempts = 3
+
+    if 'failed_attempt' not in session:
+        session['failed_attempts'] = 0
 
     if form.validate_on_submit():
         email = form.email.data
@@ -47,8 +53,19 @@ def login():
 
         if user is None or not user.verify_password(password):
             flash('Invalid email or password', 'danger')
+            session['failed_attempts'] += 1
+            attempts_remaining = max_login_attempts - session['failed_attempts']
             return redirect(url_for('login'))
 
+            if attempts_remaining > 0:
+                flash(f'You have failed to login, {attempts_remaining} left.' , 'danger')
+                return redirect(url_for('accounts.login'))
+            else:
+                flash('Too many failed logins. Try again later')
+                return redirect(url_for('accounts.login'))
+
+
+        session.pop('failed_attempts', None)
         flash('Login successful', 'success')
         return redirect(url_for('posts'))
 
