@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <title>Account Locked</title>
+    <div class="container">
+        <h1>Your Account is Locked</h1>
+        <p>You have exceeded the maximum number of invalid authentication attempts.</p>
+        <p>Please click the link below to unlock your account and try again:</p>
+        <a href="{{ url_for('accounts.user_unlock') }}" class="btn btn-primary">Unlock Account</a>
+    </div>
+{% endblock %}
