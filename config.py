@@ -4,16 +4,20 @@ from flask import Flask, url_for
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import MetaData
-
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.menu import MenuLink
 import secrets
 
+
 app = Flask(__name__)
 
 # SECRET KEY FOR FLASK FORMS
 app.config['SECRET_KEY'] = secrets.token_hex(16)
+
+app.config['RECAPTCHA_PUBLIC_KEY'] = '6LdgyVUqAAAAAOlpHkzRlx7dr2F0SYp3QTp5Mo96'
+app.config['RECAPTCHA_PRIVATE_KEY'] = '6LdgyVUqAAAAANmq8UrWlHqa4taLr7ZR8nJWh_Pd'
 
 # DATABASE CONFIGURATION
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///csc2031blog.db'
@@ -63,8 +67,7 @@ class User(db.Model):
 
     # User authentication information.
     email = db.Column(db.String(100), nullable=False, unique=True)
-    password = db.Column(db.String(100), nullable=False)
-
+    password_hash = db.Column(db.String(128), nullable=False)
     # User information
     firstname = db.Column(db.String(100), nullable=False)
     lastname = db.Column(db.String(100), nullable=False)
@@ -78,7 +81,14 @@ class User(db.Model):
         self.firstname = firstname
         self.lastname = lastname
         self.phone = phone
-        self.password = password
+        self.password_hash = generate_password_hash(password)
+
+    def verify_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    def set_password(self, new_password):
+        self.password_hash = generate_password_hash(new_password)
+
 
 
 # DATABASE ADMINISTRATOR
@@ -90,12 +100,13 @@ class MainIndexLink(MenuLink):
 class PostView(ModelView):
     column_display_pk = True
     column_hide_backrefs = False
-    column_list = ('id','userid' , 'created', 'title', 'body', 'user')
+    column_list = ('id', 'user.email', 'created', 'title', 'body')
 
 class UserView(ModelView):
-    column_display_pk = True  # optional, but I like to see the IDs in the list
+    column_display_pk = True
     column_hide_backrefs = False
-    column_list = ('id', 'email', 'password', 'firstname', 'lastname', 'phone', 'posts')
+    column_list = ('id', 'email', 'firstname', 'lastname', 'phone', 'posts')
+    form_excluded_columns = ['password_hash']
 
 
 

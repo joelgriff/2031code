@@ -58,3 +58,4 @@ def delete(id):
 
     flash('Post deleted', category='success')
     return redirect(url_for('posts.posts'))
+
