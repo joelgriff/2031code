@@ -61,8 +61,9 @@ def login():
                 flash(f'You have failed to login, {attempts_remaining} left.' , 'danger')
                 return redirect(url_for('accounts.login'))
             else:
-                flash('Too many failed logins. Try again later')
-                return redirect(url_for('accounts.login'))
+                flash('Too many failed logins. You are now locked out!', 'danger')
+
+            return redirect(url_for('accounts.login'))
 
 
         session.pop('failed_attempts', None)
