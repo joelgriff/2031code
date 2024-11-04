@@ -1,5 +1,9 @@
 from config import app
+from flask import render_template, Flask
 from flask import render_template
+from flask_limiter import Limiter
+from werkzeug.exceptions import HTTPException
+from config import attempt_limiter
 
 @app.route('/')
 def index():
@@ -34,6 +38,9 @@ def update():
 def security():
     return render_template('security/security.html')
 
+@app.errorhandler(429)
+def ratelimit(error):
+    return render_template('errors/rateLimit.html'), 429
 
 if __name__ == '__main__':
     app.run()

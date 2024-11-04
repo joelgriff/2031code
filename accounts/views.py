@@ -1,5 +1,7 @@
 from crypt import methods
+from struct import error
 
+import limiter
 from flask import Blueprint, render_template, flash, redirect, url_for, session
 from accounts.forms import RegistrationForm
 from config import User, db
@@ -7,6 +9,8 @@ from flask_login import login_user
 from accounts.forms import LoginForm
 from config import User
 from werkzeug.security import check_password_hash
+from config import attempt_limiter
+
 
 
 accounts_bp = Blueprint('accounts', __name__, template_folder='templates')
@@ -39,6 +43,7 @@ def registration():
 
 MAX_ATTEMPTS = 3
 @accounts_bp.route('/login', methods=['GET', 'POST'])
+@attempt_limiter.limit("20 per minute")
 def login():
 
     failed_attempts = session.get('failed_attempts', 0)

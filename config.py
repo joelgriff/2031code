@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from flask import Flask, url_for
+from flask_limiter.util import get_remote_address
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import MetaData
@@ -8,10 +9,21 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.menu import MenuLink
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import secrets
 
 
+
 app = Flask(__name__)
+
+
+attempt_limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["500 per day"]  # Application-wide rate limit of 500 calls per day
+)
+
 
 # SECRET KEY FOR FLASK FORMS
 app.config['SECRET_KEY'] = secrets.token_hex(16)
@@ -115,6 +127,11 @@ admin._menu = admin._menu[1:]
 admin.add_link(MainIndexLink(name='Home Page'))
 admin.add_view(PostView(Post, db.session))
 admin.add_view(UserView(User, db.session))
+
+Limit_attempt = Limiter(
+    key_func=get_remote_address,
+    default_limits= ["500 each day", "20 each minute"]
+)
 
 ## IMPORT BLUEPRINTS
 from accounts.views import accounts_bp
