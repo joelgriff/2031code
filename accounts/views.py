@@ -3,6 +3,8 @@ from struct import error
 
 import limiter
 from flask import Blueprint, render_template, flash, redirect, url_for, session
+from sqlalchemy.sql.functions import user
+
 from accounts.forms import RegistrationForm
 from config import User, db
 from flask_login import login_user
@@ -10,6 +12,7 @@ from accounts.forms import LoginForm
 from config import User
 from werkzeug.security import check_password_hash
 from config import attempt_limiter
+import pyopt
 
 
 
@@ -36,8 +39,12 @@ def registration():
         db.session.add(new_user)
         db.session.commit()
 
-        flash('Account Created', category='success')
-        return redirect(url_for('accounts.login'))
+        user.mfa_key = pyopt.random_base32()
+        user.mfa_enabled = True
+        db.session.commit()
+
+        flash('Account Created, Please set up MFA before logging in', category='success')
+        return redirect(url_for('MFA_setup.html', mfa_key=user.mfa_key))
 
     return render_template('accounts/registration.html', form=form)
 

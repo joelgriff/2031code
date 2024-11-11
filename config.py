@@ -12,7 +12,10 @@ from flask_admin.menu import MenuLink
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import secrets
-
+from sqlalchemy import Boolean, String
+from sqlalchemy.orm import validates
+from flask_login import current_user
+import pyopt
 
 
 app = Flask(__name__)
@@ -21,7 +24,7 @@ app = Flask(__name__)
 attempt_limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["500 per day"]  # Application-wide rate limit of 500 calls per day
+    default_limits=["500 per day"]# Application-wide rate limit of 500 calls per day
 )
 
 
@@ -72,6 +75,8 @@ class Post(db.Model):
        db.session.commit()
 
 
+
+
 class User(db.Model):
     __tablename__ = 'users'
 
@@ -85,6 +90,21 @@ class User(db.Model):
     lastname = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(100), nullable=False)
 
+    mfa_key = db.Column(db.String(16), nullable=False, default=lambda: pyopt.random_base32())
+    mfa_enabled = db.Column(Boolean, nullable=False, default=False)
+
+
+    @validates(mfa_key)
+    def validate_mfa_key(self, key, value):
+        if len(key) != 16:
+            raise ValueError("Invalid MFA key")
+        return value
+
+    @validates(mfa_enabled)
+    def validate_mfa_enabled(self, key, value):
+        if value not in (True, False):
+            raise ValueError("MFA enabled is a boolean")
+        return value
     # User posts
     posts = db.relationship("Post", order_by=Post.id, back_populates="user")
 
@@ -94,6 +114,8 @@ class User(db.Model):
         self.lastname = lastname
         self.phone = phone
         self.password_hash = generate_password_hash(password)
+        mfa_key = db.Column(db.String(32), nullable=False, default=str(uuid.uuid4()))
+        mfa_enabled = db.Column(db.Boolean, nullable=False, default=False)
 
     def verify_password(self, password):
         return check_password_hash(self.password_hash, password)
@@ -118,8 +140,12 @@ class UserView(ModelView):
     column_display_pk = True
     column_hide_backrefs = False
     column_list = ('id', 'email', 'firstname', 'lastname', 'phone', 'posts')
-    form_excluded_columns = ['password_hash']
+    form_excluded_columns = ['password_hash', 'mfa_key']
 
+    def give_access(self):
+        return current_user.is_authenticated and current_user.is_admin
+
+app.config['FLASK_ADMIN_FLUID_LAYOUT'] = True
 
 
 admin = Admin(app, name='DB Admin', template_mode='bootstrap4')
