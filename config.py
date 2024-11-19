@@ -1,9 +1,11 @@
 from datetime import datetime
 
+import pyotp
 from flask import Flask, url_for
 from flask_limiter.util import get_remote_address
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
+from pygments.lexer import default
 from sqlalchemy import MetaData
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_admin import Admin
@@ -12,6 +14,7 @@ from flask_admin.menu import MenuLink
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import secrets
+from flask_login import UserMixin, LoginManager
 from sqlalchemy import Boolean, String
 from sqlalchemy.orm import validates
 from flask_login import current_user
@@ -19,7 +22,6 @@ import pyopt
 
 
 app = Flask(__name__)
-
 
 attempt_limiter = Limiter(
     get_remote_address,
@@ -52,6 +54,13 @@ metadata = MetaData(
 db = SQLAlchemy(app, metadata=metadata)
 migrate = Migrate(app, db)
 
+login_manager = LoginManager(app)
+login_manager.login_view = 'accounts.login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
 # DATABASE TABLES
 class Post(db.Model):
    __tablename__ = 'posts'
@@ -77,7 +86,7 @@ class Post(db.Model):
 
 
 
-class User(db.Model):
+class User(UserMixin, db.Model):
     __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -89,24 +98,10 @@ class User(db.Model):
     firstname = db.Column(db.String(100), nullable=False)
     lastname = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(100), nullable=False)
-
-    mfa_key = db.Column(db.String(16), nullable=False, default=lambda: pyopt.random_base32())
-    mfa_enabled = db.Column(Boolean, nullable=False, default=False)
-
-
-    @validates(mfa_key)
-    def validate_mfa_key(self, key, value):
-        if len(key) != 16:
-            raise ValueError("Invalid MFA key")
-        return value
-
-    @validates(mfa_enabled)
-    def validate_mfa_enabled(self, key, value):
-        if value not in (True, False):
-            raise ValueError("MFA enabled is a boolean")
-        return value
-    # User posts
+    mfa_key = db.Column(db.String(32), nullable=False, default=lambda: secrets.token_hex(16))
+    mfa_enabled = db.Column(db.Boolean, nullable=False, default=False)
     posts = db.relationship("Post", order_by=Post.id, back_populates="user")
+
 
     def __init__(self, email, firstname, lastname, phone, password):
         self.email = email
@@ -114,14 +109,27 @@ class User(db.Model):
         self.lastname = lastname
         self.phone = phone
         self.password_hash = generate_password_hash(password)
-        mfa_key = db.Column(db.String(32), nullable=False, default=str(uuid.uuid4()))
-        mfa_enabled = db.Column(db.Boolean, nullable=False, default=False)
 
     def verify_password(self, password):
         return check_password_hash(self.password_hash, password)
 
     def set_password(self, new_password):
         self.password_hash = generate_password_hash(new_password)
+
+    @validates('mfa_key')
+    def validate_mfa_key(self, key, value):
+        if not value or len(value) not in (16, 32):
+            raise ValueError("Invalid MFA key length")
+        return value
+
+    @validates('mfa_enabled')
+    def validate_mfa_enabled(self, key, value):
+        if not isinstance(value, bool):
+            raise ValueError("MFA enabled must be a boolean")
+        return value
+
+    def __repr__(self):
+        return f"User('{self.email}', MFA Enabled: {self.mfa_enabled})"
 
 
 
@@ -140,7 +148,7 @@ class UserView(ModelView):
     column_display_pk = True
     column_hide_backrefs = False
     column_list = ('id', 'email', 'firstname', 'lastname', 'phone', 'posts')
-    form_excluded_columns = ['password_hash', 'mfa_key']
+    form_excluded_columns = ['password_hash',]
 
     def give_access(self):
         return current_user.is_authenticated and current_user.is_admin

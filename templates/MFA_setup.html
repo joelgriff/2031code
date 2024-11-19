@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-3">Set Up MFA</h2>
+    <p>
+        Use an authenticator app (e.g., Google Authenticator, Authy) to scan the QR code below.
+        Alternatively, you can manually enter the MFA key: <strong>{{ otp_url.split('secret=')[1].split('&')[0] }}</strong>
+    </p>
+    <img src="https://chart.googleapis.com/chart?cht=qr&chs=200x200&chl={{ otp_url }}" alt="MFA QR Code" class="mb-3">
+
+    <form method="POST">
+        <div class="mb-3">
+            <label for="mfa_pin" class="form-label">Enter the 6-digit code from your app</label>
+            <input type="text" name="mfa_pin" id="mfa_pin" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Enable MFA</button>
+    </form>
+
+    <a href="{{ url_for('accounts.login') }}" class="btn btn-link">Back to Login</a>
+</div>
+{% endblock %}
