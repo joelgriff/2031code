@@ -39,21 +39,12 @@
             </div>
 
             <div class="form-group">
-                {{ form.captcha() }}
-                {% if form.captcha.errors %}
-                    <div class="form-error">
-                        {{ form.captcha.errors[0] }}
-                    </div>
-                {% endif %}
-            </div>
-
-            <div class="form-group">
                 {{ form.submit(class="btn btn-primary") }}
             </div>
         </form>
 
     {% else %}
         <p>Your account is locked due to too many failed login attempts.</p>
-        <p>You have exceeded the maximum number of attempts. Please try again later or <a href="{{ url_for('unlock') }}">unlock your account</a>.</p>
+        <p>You have exceeded the maximum number of attempts. Please try again later or <a href="{{ url_for('accounts.unlock_user') }}">unlock your account</a>.</p>
     {% endif %}
 {% endblock %}
