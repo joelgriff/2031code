@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import pyotp
 from flask import Flask, url_for
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -38,6 +39,7 @@ app.config['RECAPTCHA_PRIVATE_KEY'] = '6LdgyVUqAAAAANmq8UrWlHqa4taLr7ZR8nJWh_Pd'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///csc2031blog.db'
 app.config['SQLALCHEMY_ECHO'] = True
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['FLASK_ADMIN_FLUID_LAYOUT'] = True
 
 metadata = MetaData(
     naming_convention={
@@ -53,7 +55,7 @@ db = SQLAlchemy(app, metadata=metadata)
 migrate = Migrate(app, db)
 
 # DATABASE TABLES
-class Post(db.Model):
+class Post(db.Model, UserMixin):
    __tablename__ = 'posts'
 
    id = db.Column(db.Integer, primary_key=True)
@@ -84,15 +86,22 @@ class User(db.Model, UserMixin):
     firstname = db.Column(db.String(100), nullable=False)
     lastname = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(100), nullable=False)
+    mfa_key=db.Column(db.String(32), nullable=False, default=lambda: secrets.token_hex(16))
+    mfa_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    otp_uri = db.Column(db.String(100), nullable=False)
 
     posts = db.relationship("Post", order_by=Post.id, back_populates="user")
 
-    def __init__(self, email, firstname, lastname, phone, password):
+    def __init__(self, email, firstname, lastname, phone, password, mfa_key=None, otp_uri=None):
         self.email = email
         self.firstname = firstname
         self.lastname = lastname
         self.phone = phone
         self.password_hash = generate_password_hash(password)
+        self.mfa_key = pyotp.random_base32()
+        self.mfa_enabled = False
+        self.otp_uri = pyotp.TOTP(mfa_key).provisioning_uri(name=email,issuer_name='app')
+
 
     def verify_password(self, password):
         return check_password_hash(self.password_hash, password)
@@ -100,6 +109,8 @@ class User(db.Model, UserMixin):
     def set_password(self, new_password):
         self.password_hash = generate_password_hash(new_password)
 
+    def verifyPin(self, pin):
+        return pyotp.TOTP(self.mfa_key).verify(pin)
 
 
 # DATABASE ADMINISTRATOR
@@ -116,7 +127,7 @@ class PostView(ModelView):
 class UserView(ModelView):
     column_display_pk = True
     column_hide_backrefs = False
-    column_list = ('id', 'email', 'firstname', 'lastname', 'phone', 'posts')
+    column_list = ('id', 'email', 'firstname', 'lastname', 'phone', 'posts', 'mfa_key', 'opt_uri')
     form_excluded_columns = ['password_hash']
 
 

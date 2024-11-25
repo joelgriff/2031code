@@ -1,7 +1,11 @@
+import base64
+import io
+import pyotp
+import qrcode
 from flask import Blueprint, render_template, flash, redirect, url_for, session
-from accounts.forms import RegistrationForm
+from accounts.forms import RegistrationForm, MFASetupForm
 from config import User, db, limiter
-from flask_login import login_user
+from flask_login import login_user, login_required, current_user
 from accounts.forms import LoginForm
 from config import User
 from werkzeug.security import check_password_hash
@@ -25,14 +29,15 @@ def registration():
 
         db.session.add(new_user)
         db.session.commit()
+        login_user(new_user)
 
-        flash('Account Created', category='success')
-        return redirect(url_for('accounts.login'))
+        flash('Please setup MFA')
+        return redirect(url_for('accounts.setup_mfa'))
 
     return render_template('accounts/registration.html', form=form)
 
 @accounts_bp.route('/login', methods=['GET', 'POST'])
-@limiter.limit("5 per minute")
+@limiter.limit("20 per minute")
 @limiter.limit("500 per day")
 def login():
     form = LoginForm()
@@ -45,7 +50,8 @@ def login():
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
 
-        if user and user.verify_password(form.password.data):
+        if user and user.verify_password(form.password.data) and user.verifyPin(form.pin.data):
+
             session['invalid_attempts'] = 0
             login_user(user)
             flash('Login successful!', 'success')
@@ -55,6 +61,10 @@ def login():
             session['invalid_attempts'] = invalid_attempts
             remaining_attempts = 3 - invalid_attempts
             flash(f'Invalid credentials. {remaining_attempts} attempts remaining.', 'danger')
+
+
+
+
 
     return render_template('accounts/login.html', form=form)
 
@@ -67,3 +77,43 @@ def unlock_user():
     session['invalid_attempts'] = 0
     flash('Your account has been unlocked. You can now try logging in again.', 'success')
     return redirect(url_for('login'))
+
+
+@accounts_bp.route('/setup-mfa', methods=['GET', 'POST'])
+@login_required
+def setup_mfa():
+
+    if not current_user.mfa_key or not current_user.otp_uri:
+        current_user.mfa_key = pyotp.random_base32()
+        current_user.otp_uri = pyotp.TOTP(current_user.mfa_key).provisioning_uri(
+            name=current_user.email,
+            issuer_name="YourAppName"
+        )
+        db.session.commit()
+
+    qr = qrcode.make(current_user.otp_uri)
+    qr_stream = io.BytesIO()
+    qr.save(qr_stream, format="PNG")
+    qr_stream.seek(0)
+    qr_png = base64.b64encode(qr_stream.getvalue()).decode('utf-8')
+
+    print("QR -->" + current_user.otp_uri)
+    print("key --> " + current_user.mfa_key)
+
+    if not current_user.otp_uri:
+        current_user.otp_uri = qr_png
+        db.session.commit()
+
+    form = MFASetupForm()
+
+    if form.validate_on_submit():
+        totp = pyotp.TOTP(current_user.mfa_key)
+        if totp.verify(form.verification_code.data):
+            current_user.mfa_enabled = True
+            db.session.commit()
+            flash("MFA setup complete! You can now use MFA to log in.", "success")
+            return redirect(url_for('posts.posts'))
+        else:
+            flash("Invalid verification code. Please try again.", "danger")
+
+    return render_template('mfa_setup.html', form=form, secret_key=current_user.mfa_key, qr_png=qr_png)
