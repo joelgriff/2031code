@@ -5,7 +5,7 @@ import qrcode
 from flask import Blueprint, render_template, flash, redirect, url_for, session
 from accounts.forms import RegistrationForm, MFASetupForm
 from config import User, db, limiter
-from flask_login import login_user, login_required, current_user
+from flask_login import login_user, login_required, current_user, logout_user
 from accounts.forms import LoginForm
 from config import User
 from werkzeug.security import check_password_hash
@@ -29,6 +29,7 @@ def registration():
 
         db.session.add(new_user)
         db.session.commit()
+
         login_user(new_user)
 
         flash('Please setup MFA')
@@ -47,8 +48,7 @@ def login():
             return redirect(url_for('login'))
         return render_template('login.html', form=None, locked=True)
 
-    if current_user.is_authenticated:
-        return redirect(url_for('posts.posts'))
+
 
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
@@ -120,3 +120,15 @@ def setup_mfa():
             flash("Invalid verification code. Please try again.", "danger")
 
     return render_template('mfa_setup.html', form=form, secret_key=current_user.mfa_key, qr_png=qr_png)
+
+@accounts_bp.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('You have been logged out.', 'success')
+    return redirect(url_for('accounts.login'))
+
+@accounts_bp.route('/protect')
+@login_required
+def protect():
+    return "Protected Page"
