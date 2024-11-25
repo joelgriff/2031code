@@ -1,9 +1,14 @@
 from config import app
-from flask import render_template
+from flask import render_template, jsonify
+
 
 @app.route('/')
 def index():
     return render_template('home/index.html')
+
+@app.errorhandler(429)
+def ratelimit_error(e):
+    return render_template("errors/rateLimit.html")
 
 @app.route('/account')
 def account():

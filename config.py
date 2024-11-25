@@ -1,6 +1,8 @@
 from datetime import datetime
 
 from flask import Flask, url_for
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from flask_login import UserMixin, login_manager, current_user, LoginManager
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -19,6 +21,12 @@ login_manager.init_app(app)
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[]
+)
 
 # SECRET KEY FOR FLASK FORMS
 app.config['SECRET_KEY'] = secrets.token_hex(16)

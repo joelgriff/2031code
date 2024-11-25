@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, flash, redirect, url_for, session
 from accounts.forms import RegistrationForm
-from config import User, db
+from config import User, db, limiter
 from flask_login import login_user
 from accounts.forms import LoginForm
 from config import User
@@ -32,6 +32,8 @@ def registration():
     return render_template('accounts/registration.html', form=form)
 
 @accounts_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
+@limiter.limit("500 per day")
 def login():
     form = LoginForm()
 
