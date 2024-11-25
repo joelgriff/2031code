@@ -47,6 +47,9 @@ def login():
             return redirect(url_for('login'))
         return render_template('login.html', form=None, locked=True)
 
+    if current_user.is_authenticated:
+        return redirect(url_for('posts.posts'))
+
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
 
