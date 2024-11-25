@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from flask import Flask, url_for
+from flask_login import UserMixin, login_manager, current_user, LoginManager
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import MetaData
@@ -12,6 +13,8 @@ import secrets
 
 
 app = Flask(__name__)
+login_manager = LoginManager()
+login_manager.init_app(app)
 
 # SECRET KEY FOR FLASK FORMS
 app.config['SECRET_KEY'] = secrets.token_hex(16)
@@ -60,20 +63,16 @@ class Post(db.Model):
        db.session.commit()
 
 
-class User(db.Model):
+class User(UserMixin, db.Model):
     __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
-
-    # User authentication information.
     email = db.Column(db.String(100), nullable=False, unique=True)
     password_hash = db.Column(db.String(128), nullable=False)
-    # User information
     firstname = db.Column(db.String(100), nullable=False)
     lastname = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(100), nullable=False)
 
-    # User posts
     posts = db.relationship("Post", order_by=Post.id, back_populates="user")
 
     def __init__(self, email, firstname, lastname, phone, password):

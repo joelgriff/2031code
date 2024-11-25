@@ -1,19 +1,15 @@
-from flask import Blueprint, render_template, flash, redirect, url_for
+from flask import Blueprint, render_template, flash, redirect, url_for, session
 from accounts.forms import RegistrationForm
 from config import User, db
 from flask_login import login_user
 from accounts.forms import LoginForm
 from config import User
 from werkzeug.security import check_password_hash
-
-
 accounts_bp = Blueprint('accounts', __name__, template_folder='templates')
-
 
 @accounts_bp.route('/registration', methods=['GET', 'POST'])
 def registration():
     form = RegistrationForm()
-
     if form.validate_on_submit():
 
         if User.query.filter_by(email=form.email.data).first():
@@ -39,21 +35,33 @@ def registration():
 def login():
     form = LoginForm()
 
-    if form.validate_on_submit():
-        email = form.email.data
-        password = form.password.data
-
-        user = User.query.filter_by(email=email).first()
-
-        if user is None or not user.verify_password(password):
-            flash('Invalid email or password', 'danger')
+    if session.get('invalid_attempts',0) >= 3:
+        if form.validate_on_submit():
             return redirect(url_for('login'))
+        return render_template('login.html', form=None, locked=True)
 
-        flash('Login successful', 'success')
-        return redirect(url_for('posts'))
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+
+        if user and user.verify_password(form.password.data):
+            session['invalid_attempts'] = 0
+            login_user(user)
+            flash('Login successful!', 'success')
+            return redirect(url_for('posts.posts'))
+        else:
+            invalid_attempts = session.get('invalid_attempts', 0) + 1
+            session['invalid_attempts'] = invalid_attempts
+            remaining_attempts = 3 - invalid_attempts
+            flash(f'Invalid credentials. {remaining_attempts} attempts remaining.', 'danger')
 
     return render_template('accounts/login.html', form=form)
 
 @accounts_bp.route('/account')
 def account():
     return render_template('accounts/account.html')
+
+@accounts_bp.route('/unlock', methods=['GET'])
+def unlock_user():
+    session['invalid_attempts'] = 0
+    flash('Your account has been unlocked. You can now try logging in again.', 'success')
+    return redirect(url_for('login'))
