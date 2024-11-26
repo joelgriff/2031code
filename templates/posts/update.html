@@ -6,8 +6,9 @@
     <div class="p-2 row">
         <div class="col-2"></div>
         <div class="col-8">
-            <form method="POST">
-                <div class="p-2 bg-light border border-primary" style="text-align: left">
+            <div class="p-2 bg-light border border-primary" style="text-align: left">
+                <h5>Created by: {{ post.user.firstname }} {{ post.user.lastname }}</h5>
+                <form method="POST">
                     {{ form.csrf_token() }}
                     <div class="form-group">
                         {{ form.title.label}}<span style="color: red">*</span>
@@ -20,9 +21,10 @@
                     <div>
                         {{ form.submit(class="btn btn-success") }}
                     </div>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
         <div class="col-2"></div>
     </div>
+</div>
 {% endblock %}

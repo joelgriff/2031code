@@ -64,6 +64,8 @@ class Post(db.Model, UserMixin):
    created = db.Column(db.DateTime, nullable=False)
    title = db.Column(db.Text, nullable=False)
    body = db.Column(db.Text, nullable=False)
+
+
    user = db.relationship("User", back_populates="posts")
 
    def __init__(self, title, body):

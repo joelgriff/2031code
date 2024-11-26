@@ -46,7 +46,7 @@ def login():
     if session.get('invalid_attempts',0) >= 3:
         if form.validate_on_submit():
             return redirect(url_for('login'))
-        return render_template('login.html', form=None, locked=True)
+        return render_template('accounts/login.html', form=None, locked=True)
 
 
 

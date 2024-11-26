@@ -1,4 +1,6 @@
 from flask import Blueprint, render_template, flash, url_for, redirect
+from flask_login import current_user
+
 from config import db, Post
 from posts.forms import PostForm
 from sqlalchemy import desc
@@ -14,6 +16,7 @@ def create():
 
     if form.validate_on_submit():
         new_post = Post(title=form.title.data, body=form.body.data)
+        new_post.user = current_user
 
         db.session.add(new_post)
         db.session.commit()
@@ -30,7 +33,6 @@ def posts():
 
 @posts_bp.route('/<int:id>/update', methods=('GET', 'POST'))
 def update(id):
-
     post_to_update = Post.query.filter_by(id=id).first()
 
     if not post_to_update:
@@ -44,11 +46,10 @@ def update(id):
         flash('Post updated', category='success')
         return redirect(url_for('posts.posts'))
 
-
     form.title.data = post_to_update.title
     form.body.data = post_to_update.body
 
-    return render_template('posts/update.html', form=form)
+    return render_template('posts/update.html', form=form, post=post_to_update)
 
 
 @posts_bp.route('/<int:id>/delete')
