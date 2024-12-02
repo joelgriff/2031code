@@ -4,18 +4,25 @@ import pyotp
 import qrcode
 from flask import Blueprint, render_template, flash, redirect, url_for, session
 from accounts.forms import RegistrationForm, MFASetupForm
-from config import User, db, limiter
+from config import User, db, limiter, Post
 from flask_login import login_user, login_required, current_user, logout_user
 from accounts.forms import LoginForm
 from config import User
 from werkzeug.security import check_password_hash
+
+from posts.views import posts
+
 accounts_bp = Blueprint('accounts', __name__, template_folder='templates')
 
 @accounts_bp.route('/registration', methods=['GET', 'POST'])
+@accounts_bp.route('/registration', methods=['GET', 'POST'])
 def registration():
+    if current_user.is_authenticated:  # Check if the user is already logged in
+        flash("You are already logged in. Registration is not allowed.", "danger")
+        return redirect(url_for('posts.posts'))
+
     form = RegistrationForm()
     if form.validate_on_submit():
-
         if User.query.filter_by(email=form.email.data).first():
             flash('Email already exists', category="danger")
             return render_template('accounts/registration.html', form=form)
@@ -24,18 +31,17 @@ def registration():
                         firstname=form.firstname.data,
                         lastname=form.lastname.data,
                         phone=form.phone.data,
-                        password=form.password.data,
-                        )
+                        password=form.password.data)
 
         db.session.add(new_user)
         db.session.commit()
 
         login_user(new_user)
-
-        flash('Please setup MFA')
+        flash('Please setup MFA.')
         return redirect(url_for('accounts.setup_mfa'))
 
     return render_template('accounts/registration.html', form=form)
+
 
 @accounts_bp.route('/login', methods=['GET', 'POST'])
 @limiter.limit("20 per minute")
@@ -72,8 +78,14 @@ def login():
     return render_template('accounts/login.html', form=form)
 
 @accounts_bp.route('/account')
+@login_required
 def account():
-    return render_template('accounts/account.html')
+    if not current_user.is_authenticated:
+        flash("Please log in to access your account", category="danger")
+        return redirect(url_for('accounts.login'))
+
+    user_posts = Post.query.filter_by(userid=current_user.id).all()
+    return render_template('accounts/account.html', user=current_user, posts=user_posts)
 
 @accounts_bp.route('/unlock', methods=['GET'])
 def unlock_user():

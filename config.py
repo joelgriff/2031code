@@ -4,9 +4,10 @@ import pyotp
 from flask import Flask, url_for
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask_login import UserMixin, login_manager, current_user, LoginManager
+from flask_login import UserMixin, login_manager, current_user, LoginManager, login_required
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
+from pygments.lexer import default
 from sqlalchemy import MetaData
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_admin import Admin
@@ -19,6 +20,9 @@ app = Flask(__name__)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'accounts.login'
+login_manager.login_message = "Please log in to access this page"
+login_manager.login_message_category = 'info'
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -92,10 +96,11 @@ class User(db.Model, UserMixin):
     mfa_key=db.Column(db.String(32), nullable=False, default=lambda: secrets.token_hex(16))
     mfa_enabled = db.Column(db.Boolean, nullable=False, default=False)
     otp_uri = db.Column(db.String(100), nullable=False)
+    role = db.Column(db.String(100), nullable=False, default='end_user')
 
     posts = db.relationship("Post", order_by=Post.id, back_populates="user")
 
-    def __init__(self, email, firstname, lastname, phone, password, mfa_key=None, otp_uri=None):
+    def __init__(self, email, firstname, lastname, phone, password, mfa_key=None, otp_uri=None, role='end_user'):
         self.email = email
         self.firstname = firstname
         self.lastname = lastname
@@ -104,6 +109,7 @@ class User(db.Model, UserMixin):
         self.mfa_key = pyotp.random_base32()
         self.mfa_enabled = False
         self.otp_uri = pyotp.TOTP(mfa_key).provisioning_uri(name=email,issuer_name='app')
+        self.role = role
 
 
     def verify_password(self, password):

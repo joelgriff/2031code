@@ -1,3 +1,5 @@
+from flask_login import login_required
+
 from config import app
 from flask import render_template, jsonify
 
