@@ -2,7 +2,9 @@ from datetime import datetime
 
 import pyotp
 from flask import Flask, url_for
+from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_login import UserMixin, login_manager, current_user, LoginManager, login_required
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from pygments.lexer import default
@@ -11,24 +13,26 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_admin import Admin
 from flask_admin.contrib.sqla import ModelView
 from flask_admin.menu import MenuLink
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 import secrets
-from flask_login import UserMixin, LoginManager
-from sqlalchemy import Boolean, String
-from sqlalchemy.orm import validates
-from flask_login import current_user
-import pyopt
 
 
 app = Flask(__name__)
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'accounts.login'
+login_manager.login_message = "Please log in to access this page"
+login_manager.login_message_category = 'info'
 
-attempt_limiter = Limiter(
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["500 per day"]# Application-wide rate limit of 500 calls per day
+    default_limits=[]
 )
-
 
 # SECRET KEY FOR FLASK FORMS
 app.config['SECRET_KEY'] = secrets.token_hex(16)
@@ -40,6 +44,7 @@ app.config['RECAPTCHA_PRIVATE_KEY'] = '6LdgyVUqAAAAANmq8UrWlHqa4taLr7ZR8nJWh_Pd'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///csc2031blog.db'
 app.config['SQLALCHEMY_ECHO'] = True
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['FLASK_ADMIN_FLUID_LAYOUT'] = True
 
 metadata = MetaData(
     naming_convention={
@@ -54,15 +59,8 @@ metadata = MetaData(
 db = SQLAlchemy(app, metadata=metadata)
 migrate = Migrate(app, db)
 
-login_manager = LoginManager(app)
-login_manager.login_view = 'accounts.login'
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
-
 # DATABASE TABLES
-class Post(db.Model):
+class Post(db.Model, UserMixin):
    __tablename__ = 'posts'
 
    id = db.Column(db.Integer, primary_key=True)
@@ -70,6 +68,8 @@ class Post(db.Model):
    created = db.Column(db.DateTime, nullable=False)
    title = db.Column(db.Text, nullable=False)
    body = db.Column(db.Text, nullable=False)
+
+
    user = db.relationship("User", back_populates="posts")
 
    def __init__(self, title, body):
@@ -84,31 +84,33 @@ class Post(db.Model):
        db.session.commit()
 
 
-
-
-class User(UserMixin, db.Model):
+class User(db.Model, UserMixin):
     __tablename__ = 'users'
 
     id = db.Column(db.Integer, primary_key=True)
-
-    # User authentication information.
     email = db.Column(db.String(100), nullable=False, unique=True)
     password_hash = db.Column(db.String(128), nullable=False)
-    # User information
     firstname = db.Column(db.String(100), nullable=False)
     lastname = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(100), nullable=False)
-    mfa_key = db.Column(db.String(32), nullable=False, default=lambda: secrets.token_hex(16))
+    mfa_key=db.Column(db.String(32), nullable=False, default=lambda: secrets.token_hex(16))
     mfa_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    otp_uri = db.Column(db.String(100), nullable=False)
+    role = db.Column(db.String(100), nullable=False, default='end_user')
+
     posts = db.relationship("Post", order_by=Post.id, back_populates="user")
 
-
-    def __init__(self, email, firstname, lastname, phone, password):
+    def __init__(self, email, firstname, lastname, phone, password, mfa_key=None, otp_uri=None, role='end_user'):
         self.email = email
         self.firstname = firstname
         self.lastname = lastname
         self.phone = phone
         self.password_hash = generate_password_hash(password)
+        self.mfa_key = pyotp.random_base32()
+        self.mfa_enabled = False
+        self.otp_uri = pyotp.TOTP(mfa_key).provisioning_uri(name=email,issuer_name='app')
+        self.role = role
+
 
     def verify_password(self, password):
         return check_password_hash(self.password_hash, password)
@@ -116,21 +118,8 @@ class User(UserMixin, db.Model):
     def set_password(self, new_password):
         self.password_hash = generate_password_hash(new_password)
 
-    @validates('mfa_key')
-    def validate_mfa_key(self, key, value):
-        if not value or len(value) not in (16, 32):
-            raise ValueError("Invalid MFA key length")
-        return value
-
-    @validates('mfa_enabled')
-    def validate_mfa_enabled(self, key, value):
-        if not isinstance(value, bool):
-            raise ValueError("MFA enabled must be a boolean")
-        return value
-
-    def __repr__(self):
-        return f"User('{self.email}', MFA Enabled: {self.mfa_enabled})"
-
+    def verifyPin(self, pin):
+        return pyotp.TOTP(self.mfa_key).verify(pin)
 
 
 # DATABASE ADMINISTRATOR
@@ -147,13 +136,9 @@ class PostView(ModelView):
 class UserView(ModelView):
     column_display_pk = True
     column_hide_backrefs = False
-    column_list = ('id', 'email', 'firstname', 'lastname', 'phone', 'posts')
-    form_excluded_columns = ['password_hash',]
+    column_list = ('id', 'email', 'firstname', 'lastname', 'phone', 'posts', 'mfa_key', 'opt_uri')
+    form_excluded_columns = ['password_hash']
 
-    def give_access(self):
-        return current_user.is_authenticated and current_user.is_admin
-
-app.config['FLASK_ADMIN_FLUID_LAYOUT'] = True
 
 
 admin = Admin(app, name='DB Admin', template_mode='bootstrap4')
@@ -161,11 +146,6 @@ admin._menu = admin._menu[1:]
 admin.add_link(MainIndexLink(name='Home Page'))
 admin.add_view(PostView(Post, db.session))
 admin.add_view(UserView(User, db.session))
-
-Limit_attempt = Limiter(
-    key_func=get_remote_address,
-    default_limits= ["500 each day", "20 each minute"]
-)
 
 ## IMPORT BLUEPRINTS
 from accounts.views import accounts_bp

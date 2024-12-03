@@ -3,7 +3,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField
 from wtforms import ValidationError
 import re
-from wtforms.validators import DataRequired, EqualTo, Email
+from wtforms.validators import DataRequired, EqualTo, Email, Regexp
 from flask_wtf.recaptcha import RecaptchaField
 
 
@@ -41,5 +41,11 @@ class RegistrationForm(FlaskForm):
 class LoginForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
-    recaptcha = RecaptchaField()
+    #captcha = RecaptchaField()
+    pin = PasswordField('Pin', validators=[DataRequired()])
     submit = SubmitField('Login')
+
+
+class MFASetupForm(FlaskForm):
+    verification_code = StringField('Enter 6-digit code', validators=[DataRequired()])
+    submit = SubmitField("Verify Code"

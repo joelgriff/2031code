@@ -1,8 +1,51 @@
-from flask import Blueprint, render_template
+{% extends "base.html" %}
 
-security_bp = Blueprint('posts', __name__, template_folder='templates')
+{% block content %}
+<div class="container">
+    <h1>Account Page</h1>
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div style="text-align: left" class="alert alert-{{ category }} mt-3 alert-dismissible" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert">
+                    <span>&times;</span>
+                </button>
+            </div>
+        {% endfor %}
+    {% endwith %}
 
-@security_bp.route('/security')
-def security():
-    return render_template('security/security.html')
+    {% if user.is_authenticated %}
+        <div class="card border border-primary">
+            <div class="card-header bg-primary text-white">
+                <h4>Your Account Details</h4>
+            </div>
+            <div class="card-body">
+                <p><strong>Account Number:</strong> {{ user.id }}</p>
+                <p><strong>First Name:</strong> {{ user.firstname }}</p>
+                <p><strong>Last Name:</strong> {{ user.lastname }}</p>
+                <p><strong>Phone Number:</strong> {{ user.phone }}</p>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <h3>Your Posts</h3>
+            {% if posts %}
+                {% for post in posts %}
+                    <div class="card border border-dark mb-3">
+                        <div class="card-header bg-dark text-white">
+                            <h4>{{ post.title }}</h4>
+                            <small>{{ post.created.strftime('%H:%M:%S %d-%m-%Y') }}</small>
+                        </div>
+                        <div class="card-body">{{ post.body }}</div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p>You haven't created any posts yet.</p>
+            {% endif %}
+        </div>
+    {% else %}
+        <p>You must be logged in to view your account details.</p>
+    {% endif %}
+</div>
+{% endblock %}

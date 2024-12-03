@@ -2,6 +2,7 @@
 
 {% block content %}
     <title>Login</title>
+
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             <ul class="flashes">
@@ -12,7 +13,9 @@
         {% endif %}
     {% endwith %}
 
-    {% if form %}
+    {% if session.get('invalid_attempts', 0) < 3 %}
+        <!-- Start of the form -->
+
         <form method="POST" action="">
             {{ form.hidden_tag() }}
 
@@ -37,10 +40,13 @@
             </div>
 
             <div class="form-group">
-                {{  form.recaptcha() }}
-                {%  if form.recaptcha.errors  %}
-                <div class="form-error">
-                    {{ form.recaptcha.errors[0] }}
+
+              
+                <label for="pin" class="form-label">PIN</label>
+                <input type="password" id="pin" name="pin" class="form-control" placeholder="Enter your PIN" required>
+            {% if form.pin.errors %}
+                <div class="text-danger">
+                    {{ form.pin.errors[0] }}     
                 </div>
             {% endif %}
             </div>
@@ -52,3 +58,13 @@
     {% endif %}
 {% endblock %}
 
+            <div class="form-group">
+                {{ form.submit(class="btn btn-primary") }}
+            </div>
+        </form>
+
+    {% else %}
+        <p>Your account is locked due to too many failed login attempts.</p>
+        <p>You have exceeded the maximum number of attempts. Please try again later or <a href="{{ url_for('accounts.unlock_user') }}">unlock your account</a>.</p>
+    {% endif %}
+{% endblock %}

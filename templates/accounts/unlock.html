@@ -1,0 +1,12 @@
+{& extends "base.html"} -->
+
+{& block content%}
+    <title>Account Locked</title>
+    <div class="container">
+        <h1>Your Account is locked</h1>
+        <p> Number of Invalid login attempts exceeded</p>
+        <p>Click the link below to lock your account</p>
+        <a href="{{ url_for('accounts.unlock_user') }}" class="btn btn-primary">Unlock Account</a>
+    </div>
+{% endblock %}
+
