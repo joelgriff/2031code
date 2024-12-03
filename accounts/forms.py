@@ -48,4 +48,4 @@ class LoginForm(FlaskForm):
 
 class MFASetupForm(FlaskForm):
     verification_code = StringField('Enter 6-digit code', validators=[DataRequired()])
-    submit = SubmitField("Verify Code")
+    submit = SubmitField("Verify Code"
